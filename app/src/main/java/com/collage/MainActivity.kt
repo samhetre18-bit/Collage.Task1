@@ -228,6 +228,7 @@ fun ImageCell(state: ImageState, radius: Float, onImageClick: () -> Unit) {
             AsyncImage(
                 model = state.uri,
                 contentDescription = null,
+                contentScale = ContentScale.Fit, // This ensures the photo fills the rectangle
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer(
@@ -236,8 +237,7 @@ fun ImageCell(state: ImageState, radius: Float, onImageClick: () -> Unit) {
                         translationX = offset.x,
                         translationY = offset.y,
                         rotationZ = rotation
-                    ),
-                contentScale = ContentScale.Crop // This ensures the photo fills the rectangle
+                    )
             )
         } else {
             Text("+", color = Color.Gray, fontSize = 30.sp)
