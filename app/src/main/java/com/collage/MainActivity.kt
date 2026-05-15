@@ -15,10 +15,16 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,6 +41,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.test.espresso.base.Default
@@ -42,6 +49,7 @@ import coil.compose.AsyncImage
 import com.collage.Settings
 import com.google.androidgamesdk.gametextinput.Settings
 import kotlinx.coroutines.launch
+import androidx.compose.ui.text.font.FontFamily
 
 private val Unit.Settings: ImageVector
     get() {
@@ -79,12 +87,25 @@ class MainActivity : ComponentActivity() {
 }@Composable
 fun EditorScreen(isDarkMode: Boolean, onThemeToggle: () -> Unit) {
     // TOOLS
+    // Add these with your other variables
+    val fontOptions = listOf(FontFamily.Default, FontFamily.Serif, FontFamily.Monospace, FontFamily.Cursive)
+    var selectedFont by remember { mutableStateOf(FontFamily.Default) }
+// We already have overlayTextColor, we'll just use the same presetColors list from earlier
+    var overlayText by remember { mutableStateOf("TAP TO EDIT") }
+    var overlayTextColor by remember { mutableStateOf(Color.White) }
+    var textOffset by remember { mutableStateOf(Offset(200f, 200f)) }
     var showSettings by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val graphicsLayer = rememberGraphicsLayer()
-
     // STATE
+    // The list of colors you want to offer
+    val presetColors = listOf(
+        Color.White, Color.Black, Color(0xFFF44336),
+        Color(0xFF4CAF50), Color(0xFF2196F3), Color(0xFFFFEB3B)
+    )
+// The variable that remembers the selection
+    var collageBgColor by remember { mutableStateOf(Color.White) }
     var gridCount by remember { mutableIntStateOf(4) }
     var radius by remember { mutableFloatStateOf(0f) }
     var spacing by remember { mutableFloatStateOf(0f) }
@@ -96,7 +117,6 @@ fun EditorScreen(isDarkMode: Boolean, onThemeToggle: () -> Unit) {
             repeat(gridCount) { add(ImageState()) }
         }
     }
-
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
@@ -107,7 +127,13 @@ fun EditorScreen(isDarkMode: Boolean, onThemeToggle: () -> Unit) {
     // This makes the gap between photos smaller in Light Mode for a 'cleaner' look
     val activeSpacing = if (isDarkMode) spacing.dp else (spacing * 0.5f).dp
 
-    Column(modifier = Modifier.fillMaxSize().background(color = MaterialTheme.colorScheme.background).systemBarsPadding()) {
+    val scrollState = rememberScrollState()
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .systemBarsPadding()
+            .verticalScroll(scrollState) // THIS allows you to swipe down
+    ) {
         Text(
             "CUSTOM EDITOR",
             color = Color(0xFF6B7280),
@@ -147,7 +173,8 @@ fun EditorScreen(isDarkMode: Boolean, onThemeToggle: () -> Unit) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f) // Keep it a perfect square collage
+                .aspectRatio(1f)
+                .background(collageBgColor) // <--- THIS LINKS IT
                 .padding(spacing.dp)
                 .drawWithContent {
                     graphicsLayer.record { this@drawWithContent.drawContent() }
@@ -201,23 +228,95 @@ fun EditorScreen(isDarkMode: Boolean, onThemeToggle: () -> Unit) {
                     }
                 }
             }
+            Text(
+                text = overlayText,
+                color = overlayTextColor,
+                fontFamily = selectedFont, // <--- Added comma
+                style = MaterialTheme.typography.headlineSmall, // <--- Added comma
+                modifier = Modifier
+                    .offset { IntOffset(textOffset.x.toInt(), textOffset.y.toInt()) }
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, pan, _, _ ->
+                            textOffset += pan
+                        }
+                    }
+            )
         }
 
         // CONTROLS PANEL
         Column(
             modifier = Modifier
-                .background(Color(0xFF252525))
-                .padding(20.dp)
-                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .fillMaxWidth()
+                .padding(16.dp), // Overall outer padding
+            verticalArrangement = Arrangement.spacedBy(16.dp) // <--- THIS is the magic line
         ) {
-            Text("RADIUS: ${radius.toInt()}", color = Color.White)
-            Slider(value = radius, onValueChange = { radius = it }, valueRange = 0f..100f)
-
-            Text("SPACING: ${spacing.toInt()}", color = Color.White)
-            Slider(value = spacing, onValueChange = { spacing = it }, valueRange = 0f..50f)
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            Text(
+                "CHOOSE BACKGROUND",
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(top = 12.dp)
+            )
+
+            LazyRow(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(presetColors) { color ->
+                    Box(
+                        modifier = Modifier
+                            .size(45.dp)
+                            .background(color, CircleShape)
+                            .border(
+                                width = if (collageBgColor == color) 3.dp else 1.dp,
+                                color = if (collageBgColor == color) Color.Blue else Color.Gray,
+                                shape = CircleShape
+                            )
+                            .clickable { collageBgColor = color } // The magic happens here
+                    )
+                }
+            }
+            OutlinedTextField(
+                value = overlayText,
+                onValueChange = { overlayText = it },
+                label = { Text("Edit Overlay Text") },
+                modifier = Modifier.fillMaxWidth().padding(8.dp)
+            )
+            // TEXT COLOR PICKER
+            Text("TEXT COLOR", style = MaterialTheme.typography.labelLarge)
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(presetColors) { color ->
+                    Box(
+                        modifier = Modifier
+                            .size(30.dp)
+                            .background(color, CircleShape)
+                            .border(1.dp, Color.Gray, CircleShape)
+                            .clickable { overlayTextColor = color }
+                    )
+                }
+            }
+// FONT STYLE PICKER
+            Text("FONT STYLE", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { selectedFont = FontFamily.Serif }) { Text("Serif") }
+                Button(onClick = { selectedFont = FontFamily.Monospace }) { Text("Mono") }
+                Button(onClick = { selectedFont = FontFamily.Cursive }) { Text("Cursive") }
+            }
+            Text(
+                    "RADIUS: ${radius.toInt()}",
+            color = Color.White,
+            style = MaterialTheme.typography.labelMedium, // <--- Add this style here
+            )
+            Slider(value = radius, onValueChange = { radius = it }, valueRange = 0f..100f)
+
+            Text(
+                "SPACING: ${spacing.toInt()}",
+                color = Color.White,
+                style = MaterialTheme.typography.labelMedium, // <--- And here
+            )
+            Slider(value = spacing, onValueChange = { spacing = it }, valueRange = 0f..50f)
+            Spacer(modifier = Modifier.height(8.dp))
             Button(
                 onClick = {
                     scope.launch {
