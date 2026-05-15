@@ -1,7 +1,13 @@
 package com.collage // Make sure this matches your actual package name at the top!
 
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import android.content.ContentValues
+import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -12,8 +18,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,13 +31,22 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.test.espresso.base.Default
 import coil.compose.AsyncImage
+import com.collage.Settings
+import com.google.androidgamesdk.gametextinput.Settings
 import kotlinx.coroutines.launch
+
+private val Unit.Settings: ImageVector
+    get() {
+        TODO()
+    }
 
 // 1. DATA MODEL
 data class ImageState(
@@ -41,21 +54,32 @@ data class ImageState(
 )
 
 class MainActivity : ComponentActivity() {
+    // Inside your MainActivity class
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
-                    EditorScreen()
+            // 1. Create the Toggle State
+            var isDarkMode by remember { mutableStateOf(true) }
+
+            // 2. Wrap the theme around the toggle
+            MaterialTheme(
+                colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    // Surface will now automatically pick the right background color
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    // Pass the toggle to your screen so we can change it with a button
+                    EditorScreen(isDarkMode = isDarkMode, onThemeToggle = { isDarkMode = !isDarkMode })
                 }
             }
         }
     }
-}
-
-@Composable
-fun EditorScreen() {
+}@Composable
+fun EditorScreen(isDarkMode: Boolean, onThemeToggle: () -> Unit) {
     // TOOLS
+    var showSettings by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val graphicsLayer = rememberGraphicsLayer()
@@ -80,11 +104,13 @@ fun EditorScreen() {
             images[selectedIndex] = images[selectedIndex].copy(uri = uri)
         }
     }
+    // This makes the gap between photos smaller in Light Mode for a 'cleaner' look
+    val activeSpacing = if (isDarkMode) spacing.dp else (spacing * 0.5f).dp
 
-    Column(modifier = Modifier.fillMaxSize().background(Color(0xFF1A1A1A))) {
+    Column(modifier = Modifier.fillMaxSize().background(color = MaterialTheme.colorScheme.background).systemBarsPadding()) {
         Text(
             "CUSTOM EDITOR",
-            color = Color.White,
+            color = Color(0xFF6B7280),
             modifier = Modifier.padding(20.dp),
             style = MaterialTheme.typography.headlineMedium
         )
@@ -94,6 +120,12 @@ fun EditorScreen() {
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+
+            IconButton(onClick = {  showSettings = true }) {
+                IconButton(onClick = { showSettings = true }) {
+                    Text("⚙️", fontSize = 24.sp)
+                }
+            }
             listOf(2, 3, 4, 5).forEach { count ->
                 Button(
                     onClick = { gridCount = count },
@@ -200,6 +232,25 @@ fun EditorScreen() {
             }
         }
     }
+    if (showSettings) {
+        AlertDialog(
+            onDismissRequest = { showSettings = false },
+            confirmButton = {
+                TextButton(onClick = { showSettings = false }) { Text("Done") }
+            },
+            title = { Text("Settings") },
+            text = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Dark Mode", color = MaterialTheme.colorScheme.onSurface)
+                    Switch(checked = isDarkMode, onCheckedChange = { onThemeToggle() })
+                }
+            }
+        )
+    }
 }
 
 
@@ -248,22 +299,22 @@ fun ImageCell(state: ImageState, radius: Float, onImageClick: () -> Unit) {
 
 
 
-fun saveBitmapToGallery(context: android.content.Context, bitmap: android.graphics.Bitmap) {
+fun saveBitmapToGallery(context: Context, bitmap: Bitmap) {
     val filename = "Collage_${System.currentTimeMillis()}.jpg"
-    val values = android.content.ContentValues().apply {
-        put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, filename)
-        put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-        put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CollageMaker")
+    val values = ContentValues().apply {
+        put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CollageMaker")
     }
 
     val uri = context.contentResolver.insert(
-        android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
         values
     )
 
     uri?.let {
         context.contentResolver.openOutputStream(it).use { stream ->
-            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 100, stream!!)
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, stream!!)
         }
         Toast.makeText(context, "Saved to Gallery!", Toast.LENGTH_SHORT).show()
     }

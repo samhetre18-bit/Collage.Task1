@@ -47,6 +47,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.espresso.core)
+    implementation(libs.androidx.games.activity)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.room.ktx)
     testImplementation(libs.junit)
